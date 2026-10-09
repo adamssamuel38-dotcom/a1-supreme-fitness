@@ -1,0 +1,12 @@
+create table public.sandbox_memberships (like public.memberships including all);
+create table public.sandbox_membership_attempts (like public.membership_attempts including all);
+create table public.sandbox_payment_config (id integer primary key check(id=1),request_id uuid not null default gen_random_uuid(),plan_id text);
+insert into public.sandbox_payment_config(id) values(1);
+alter table public.sandbox_memberships enable row level security;
+alter table public.sandbox_membership_attempts enable row level security;
+alter table public.sandbox_payment_config enable row level security;
+revoke all on public.sandbox_memberships,public.sandbox_membership_attempts,public.sandbox_payment_config from anon,authenticated;
+grant all on public.sandbox_memberships,public.sandbox_membership_attempts,public.sandbox_payment_config to service_role;
+create policy sandbox_service on public.sandbox_memberships to service_role using(true) with check(true);
+create policy sandbox_service on public.sandbox_membership_attempts to service_role using(true) with check(true);
+create policy sandbox_service on public.sandbox_payment_config to service_role using(true) with check(true);

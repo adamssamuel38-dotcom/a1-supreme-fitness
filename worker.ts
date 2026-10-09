@@ -53,7 +53,8 @@ export default {async fetch(req:Request,env:Env){
   if(url.pathname==='/api/session')response=json({user:u?{id:u.id,email:u.email}:null});
   else if(!u&&!['/api/leads','/api/health'].includes(url.pathname))response=json({error:'Sign in to access your account.'},401);
   else{
-   const upstream=new URL(env.SUPABASE_URL+'/functions/v1/member-api'+url.pathname+url.search);
+   const sandbox=url.pathname==='/api/sandbox/membership';
+   const upstream=new URL(env.SUPABASE_URL+'/functions/v1/'+(sandbox?'payment-sandbox/api/membership':'member-api'+url.pathname)+url.search);
    const h=new Headers({...(token?{'Authorization':'Bearer '+token}:{}),'apikey':env.SUPABASE_PUBLISHABLE_KEY,'X-App-Origin':url.origin});
    if(req.headers.get('content-type'))h.set('content-type',req.headers.get('content-type')!);
    if(Number(req.headers.get('content-length'))>21*1024*1024)response=json({error:'File too large.'},413);
