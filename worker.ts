@@ -1,7 +1,7 @@
 import {createClient} from '@supabase/supabase-js';
 type Env={ASSETS:{fetch:(r:Request)=>Promise<Response>};SUPABASE_URL:string;SUPABASE_PUBLISHABLE_KEY:string};
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
-const safePath=(x:unknown)=>typeof x==='string'&&/^\/(?!\/)/.test(x)&&!x.includes('\\')?x:'/membership';
+const safePath=(x:unknown)=>typeof x==='string'&&/^\/(?!\/)/.test(x)&&!x.includes('\\')?x:'/app';
 function readCookies(req:Request){return Object.fromEntries((req.headers.get('cookie')||'').split(';').map(x=>{const n=x.indexOf('=');return [x.slice(0,n).trim(),x.slice(n+1)];}));}
 function cookie(name:string,value:string,maxAge:number){return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;}
 export default {async fetch(req:Request,env:Env){
@@ -33,7 +33,7 @@ export default {async fetch(req:Request,env:Env){
   }else if(action==='signup'){
    const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:url.origin+'/login'}});
    if(error)response=json({error:'Account creation is unavailable. Please try again later or sign in if you already have an account.'},400);
-   else {if(data.session)setSession(data.session);response=json({message:'Check your email to confirm your account. Then sign in to choose your membership.',next:data.session?'/membership':null});}
+   else {if(data.session)setSession(data.session);response=json({message:'Check your email to confirm your account. Then sign in to open your free app.',next:data.session?'/app':null});}
   }else if(action==='recover'){
    const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:url.origin+'/login?mode=reset'});
    response=error?json({error:'Password recovery is temporarily unavailable. Please try again later.'},503):json({message:'If an account matches that email, a password reset link will be sent.'});
@@ -44,7 +44,7 @@ export default {async fetch(req:Request,env:Env){
    else{const check=await sb.auth.getUser(data.session.access_token);if(check.error)response=json({error:'Session verification failed.'},401);else{setSession(data.session);response=json({ok:true});}}
   }else if(action==='password'){
    const u=await user();if(!u)response=json({error:'Open the password reset email first.'},401);
-   else{const {error}=await sb.auth.setSession({access_token:token!,refresh_token:cookies['__Host-a1-refresh']||''});if(error)response=json({error:'Please request a fresh reset link.'},401);else{const result=await sb.auth.updateUser({password});response=result.error?json({error:'Could not update the password.'},400):json({next:'/membership'});}}
+   else{const {error}=await sb.auth.setSession({access_token:token!,refresh_token:cookies['__Host-a1-refresh']||''});if(error)response=json({error:'Please request a fresh reset link.'},401);else{const result=await sb.auth.updateUser({password});response=result.error?json({error:'Could not update the password.'},400):json({next:'/app'});}}
   }else if(action==='logout'){
    if(token&&cookies['__Host-a1-refresh']){await sb.auth.setSession({access_token:token,refresh_token:cookies['__Host-a1-refresh']});await sb.auth.signOut({scope:'local'});}clear();response=json({next:'/'});
   }else response=json({error:'Not found.'},404);

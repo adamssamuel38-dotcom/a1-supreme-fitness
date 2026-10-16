@@ -2,7 +2,7 @@ import {createClient} from 'npm:@supabase/supabase-js@2.102.0';
 import {z} from 'npm:zod@3.25.76';
 import {profileSchema,calculate} from './nutrition.ts';
 import {clientSchema,buildMonth} from './training.ts';
-import {membershipStatus,createSubscription,PaymentError} from './payments.ts';
+
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(x=>!isNaN(Date.parse(x))&&new Date(x).toISOString().slice(0,10)===x);
 const month=z.string().regex(/^20\d{2}-(0[1-9]|1[0-2])$/);
@@ -11,7 +11,7 @@ Deno.serve(async(req:Request)=>{
  try{
  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});
  const endpoint=new URL(req.url).pathname.split('/api/')[1];
- if(endpoint==='health'&&req.method==='GET')return json({backend:true,payments:!!Deno.env.get('PAYPAL_CLIENT_SECRET'),ai:!!Deno.env.get('OPENAI_API_KEY')});
+ if(endpoint==='health'&&req.method==='GET')return json({backend:true,payments:false,access:'free',ai:!!Deno.env.get('OPENAI_API_KEY')});
  if(endpoint==='leads'&&req.method==='POST'){
   const raw=await req.text();if(raw.length>12000)return json({error:'Submission too large.'},413);
   const input=z.object({profile:profileSchema,diet:z.enum(['balanced','plant']),marketing:z.boolean(),consent:z.literal(true),website:z.string().max(0),id:z.string().uuid()}).parse(JSON.parse(raw));
@@ -22,12 +22,12 @@ Deno.serve(async(req:Request)=>{
  const {data,error}=await db.auth.getUser(auth.slice(7));if(error||!data.user?.email)return json({error:'Sign in to access your account.'},401);
  const user=data.user.id,email=data.user.email;const url=new URL(req.url);const path=url.pathname.split('/api/')[1]||'';const part=path.split('/');
  if(path==='membership'){
-  if(req.method==='GET')return json(await membershipStatus(db,user));
-  if(req.method==='POST')return json(await createSubscription(db,user,req.headers.get('X-App-Origin')||''));
+  if(req.method==='GET')return json({paid:false,access:true,free:true,ready:true,status:'FREE'});
+  if(req.method==='POST')return json({error:'App access is now free. No subscription is required.',next:'/app'},410);
   return json({error:'Method not allowed.'},405);
  }
  if(part[0]!=='client')return json({error:'Not found.'},404);
- const state=await membershipStatus(db,user);if(!state.paid)return json({error:state.ready?'A paid membership is required.':'Membership service activation is pending.',membershipUrl:'/membership'},state.ready?402:503);
+
  const action=part[1];const body=async()=>{const s=await req.text();if(s.length>18000)throw Error('Too large');return JSON.parse(s);};
  if(action==='profile'){
   if(req.method==='GET'){const row=checked(await db.from('member_profiles').select('profile').eq('user_id',user).maybeSingle());return json({profile:row?.profile||null,chatReady:!!Deno.env.get('OPENAI_API_KEY')});}
@@ -73,5 +73,5 @@ Deno.serve(async(req:Request)=>{
   }
  }
  return json({error:'Not found.'},404);
- }catch(e){if(e instanceof PaymentError)return json({error:e.message},e.status);if(e instanceof z.ZodError||e instanceof SyntaxError)return json({error:'Please check the fields and try again.'},400);return json({error:'Could not complete that action. Please try again.'},503);}
+ }catch(e){if(e instanceof z.ZodError||e instanceof SyntaxError)return json({error:'Please check the fields and try again.'},400);return json({error:'Could not complete that action. Please try again.'},503);}
 });
